@@ -36,7 +36,7 @@ std::string_view constexpr kCompilerNameEnvVar = "COMP_DB_HOOK_COMPILER";
 std::string_view constexpr kDefaultCompilerName = "clang++";
 
 auto constexpr kCompilerFlagsWithArgument =
-    tsdb2::common::fixed_flat_set_of<std::string_view>({"-include", "-o", "-target"});
+    tsdb2::common::fixed_flat_set_of<std::string_view>({"-include", "-iquote", "-o", "-target"});
 
 char constexpr kDirectoryField[] = "directory";
 char constexpr kArgumentsField[] = "arguments";
@@ -149,10 +149,16 @@ SourceFileSet GetCurrentFiles(std::string_view const cwd,
   return files;
 }
 
-std::string GetCurrentWorkingDirectory() { return std::string(::get_current_dir_name()); }
+absl::StatusOr<std::string> GetCurrentWorkingDirectory() {
+  char buffer[PATH_MAX + 1];
+  if (!::getcwd(buffer, PATH_MAX)) {
+    return absl::ErrnoToStatus(errno, "getcwd");
+  }
+  return std::string(buffer);
+}
 
-void UpdateEntries(absl::Span<std::string const> arguments, CommandEntries* const entries) {
-  auto const cwd = GetCurrentWorkingDirectory();
+absl::Status UpdateEntries(absl::Span<std::string const> arguments, CommandEntries* const entries) {
+  DEFINE_CONST_OR_RETURN(cwd, GetCurrentWorkingDirectory());
   auto source_files = GetCurrentFiles(cwd, arguments);
   for (auto& entry : *entries) {
     auto const maybe_file_path = entry.get<kFileField>();
@@ -175,6 +181,7 @@ void UpdateEntries(absl::Span<std::string const> arguments, CommandEntries* cons
         /*file=*/file.relative_path(),
     });
   }
+  return absl::OkStatus();
 }
 
 absl::Status RewriteFile(FD const& fd, CommandEntries const& entries) {
@@ -201,7 +208,7 @@ absl::Status UpdateCommandFile(int const argc, char const* const argv[]) {
   DEFINE_OR_RETURN(lock, tsdb2::io::ExclusiveFileLock::Acquire(fd));
   DEFINE_VAR_OR_RETURN(entries, ParseCommandFile(fd));
   auto const arguments = MakeArguments(argc, argv);
-  UpdateEntries(arguments, &entries);
+  RETURN_IF_ERROR(UpdateEntries(arguments, &entries));
   return RewriteFile(fd, entries);
 }
 
