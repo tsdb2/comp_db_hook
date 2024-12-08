@@ -8,6 +8,20 @@ This small program can be used in a C++ project to intercept all calls to the co
 `comp_db_hook` is particularly useful with [Bazel](https://bazel.build/), which doesn't generate a
 compilation database natively and is quite hard to extend.
 
+## Installation
+
+Requirements:
+
+* Clang with C++17 support,
+* [Bazel](https://bazel.build/).
+
+Compile with Bazel, then run the `install.sh` script:
+
+```sh
+$ bazel build -c opt ...
+$ sudo ./install.sh
+```
+
 ## Usage Instructions
 
 Just replace the compiler name with `comp_db_hook` in the compilation command line.

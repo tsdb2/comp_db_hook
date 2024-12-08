@@ -6,9 +6,11 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "absl/log/check.h"
+#include "absl/log/initialize.h"
 #include "absl/log/log.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
@@ -50,6 +52,43 @@ using CommandEntry =
                  json::Field<std::optional<std::string>, kFileField>>;
 
 using CommandEntries = std::vector<CommandEntry>;
+
+struct SourceFile {
+  // Custom "less-than" functor to index source files by absolute path.
+  struct Less {
+    bool operator()(SourceFile const& lhs, SourceFile const& rhs) const {
+      return lhs.absolute_path() < rhs.absolute_path();
+    }
+  };
+
+  explicit SourceFile(std::string_view const base_directory, std::string_view const relative_path)
+      : relative_path_(relative_path), absolute_path_(GetFullPath(base_directory, relative_path)) {}
+
+  SourceFile(SourceFile&&) noexcept = default;
+  SourceFile& operator=(SourceFile&&) noexcept = default;
+  SourceFile(SourceFile const&) = default;
+  SourceFile& operator=(SourceFile const&) = default;
+
+  std::string_view relative_path() const { return relative_path_; }
+  std::string_view absolute_path() const { return absolute_path_; }
+
+ private:
+  static std::string GetFullPath(std::string_view const base_directory,
+                                 std::string_view const file_name) {
+    if (base_directory.empty() || absl::StartsWith(file_name, "/")) {
+      return std::string(file_name);
+    } else if (absl::EndsWith(base_directory, "/")) {
+      return absl::StrCat(base_directory, file_name);
+    } else {
+      return absl::StrCat(base_directory, "/", file_name);
+    }
+  }
+
+  std::string relative_path_;
+  std::string absolute_path_;
+};
+
+using SourceFileSet = tsdb2::common::flat_set<SourceFile, SourceFile::Less>;
 
 std::string GetCommandFilePath() {
   return tsdb2::common::GetEnv(std::string(kCommandFilePathEnvVar))
@@ -97,23 +136,14 @@ std::vector<std::string> MakeArguments(int const argc, char const* const argv[])
   return result;
 }
 
-std::string GetFullPath(std::string const base_directory, std::string const file_name) {
-  if (base_directory.empty() || absl::StartsWith(file_name, "/")) {
-    return std::string(file_name);
-  } else if (absl::EndsWith(base_directory, "/")) {
-    return absl::StrCat(base_directory, file_name);
-  } else {
-    return absl::StrCat(base_directory, "/", file_name);
-  }
-}
-
-tsdb2::common::flat_set<std::string> GetCurrentFiles(absl::Span<std::string const> const args) {
-  tsdb2::common::flat_set<std::string> files;
-  for (size_t i = 0; i < args.size(); ++i) {
+SourceFileSet GetCurrentFiles(std::string_view const cwd,
+                              absl::Span<std::string const> const args) {
+  SourceFileSet files;
+  for (size_t i = 1; i < args.size(); ++i) {
     if (kCompilerFlagsWithArgument.contains(args[i])) {
       ++i;
     } else if (!absl::StartsWith(args[i], "-")) {
-      files.emplace(args[i]);
+      files.emplace(cwd, args[i]);
     }
   }
   return files;
@@ -122,28 +152,27 @@ tsdb2::common::flat_set<std::string> GetCurrentFiles(absl::Span<std::string cons
 std::string GetCurrentWorkingDirectory() { return std::string(::get_current_dir_name()); }
 
 void UpdateEntries(absl::Span<std::string const> arguments, CommandEntries* const entries) {
-  auto source_files = GetCurrentFiles(arguments);
+  auto const cwd = GetCurrentWorkingDirectory();
+  auto source_files = GetCurrentFiles(cwd, arguments);
   for (auto& entry : *entries) {
-    auto const maybe_file_name = entry.get<kFileField>();
-    if (!maybe_file_name.has_value()) {
+    auto const maybe_file_path = entry.get<kFileField>();
+    if (!maybe_file_path.has_value()) {
       LOG(ERROR) << GetCommandFilePath() << " contains an entry without a `file` field:\n"
                  << json::Stringify(entry);
       continue;
     }
-    auto const& file_name = maybe_file_name.value();
-    auto const base_directory = entry.get<kDirectoryField>().value_or("");
-    auto const full_path = GetFullPath(base_directory, file_name);
-    if (source_files.erase(full_path)) {
+    auto const base_directory = entry.get<kDirectoryField>().value_or(cwd);
+    SourceFile file{base_directory, maybe_file_path.value()};
+    if (source_files.erase(file)) {
       entry.get<kArgumentsField>() = std::vector<std::string>(arguments.begin(), arguments.end());
     }
   }
-  auto const cwd = GetCurrentWorkingDirectory();
   for (auto const& file : source_files) {
     entries->emplace_back(CommandEntry{
         json::kInitialize,
         /*directory=*/cwd,
         /*arguments=*/std::vector<std::string>(arguments.begin(), arguments.end()),
-        /*file=*/file,
+        /*file=*/file.relative_path(),
     });
   }
 }
@@ -155,7 +184,7 @@ absl::Status RewriteFile(FD const& fd, CommandEntries const& entries) {
   if (::lseek(*fd, 0, SEEK_SET) < 0) {
     return absl::ErrnoToStatus(errno, "ftruncate");
   }
-  auto const json = tsdb2::json::Stringify(entries);
+  auto const json = tsdb2::json::Stringify(entries, json::StringifyOptions{.pretty = true}) + "\n";
   size_t written = 0;
   while (written < json.size()) {
     auto const result = ::write(*fd, json.data() + written, json.size() - written);
@@ -171,7 +200,7 @@ absl::Status UpdateCommandFile(int const argc, char const* const argv[]) {
   DEFINE_CONST_OR_RETURN(fd, OpenCommandFile());
   DEFINE_OR_RETURN(lock, tsdb2::io::ExclusiveFileLock::Acquire(fd));
   DEFINE_VAR_OR_RETURN(entries, ParseCommandFile(fd));
-  auto const arguments = MakeArguments(argc - 1, argv + 1);
+  auto const arguments = MakeArguments(argc, argv);
   UpdateEntries(arguments, &entries);
   return RewriteFile(fd, entries);
 }
@@ -179,10 +208,11 @@ absl::Status UpdateCommandFile(int const argc, char const* const argv[]) {
 }  // namespace
 
 int main(int const argc, char* const argv[]) {
-  CHECK_OK(UpdateCommandFile(argc - 1, argv + 1));
+  absl::InitializeLog();
+  CHECK_OK(UpdateCommandFile(argc, argv));
   auto const compiler_name = tsdb2::common::GetEnv(std::string(kCompilerNameEnvVar))
                                  .value_or(std::string(kDefaultCompilerName));
-  ::execvp(compiler_name.c_str(), argv + 1);
+  ::execvp(compiler_name.c_str(), argv);
   LOG(ERROR) << absl::ErrnoToStatus(errno, "execvp");
   return 1;
 }
