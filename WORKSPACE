@@ -29,7 +29,7 @@ http_archive(
 
 http_archive(
     name = "com_tsdb2_platform",
-    sha256 = "4b41644f9931e46f164a0c917c5e6de2f801e92fffe88656f98022451955bd28",
-    strip_prefix = "platform-0.0.4",
-    urls = ["https://github.com/tsdb2/platform/archive/refs/tags/v0.0.4.tar.gz"],
+    sha256 = "39aa487d8b9137b705a2ca54fde1a91cc26d256e7258888601001778928378d8",
+    strip_prefix = "platform-0.0.5",
+    urls = ["https://github.com/tsdb2/platform/archive/refs/tags/v0.0.5.tar.gz"],
 )
