@@ -35,8 +35,8 @@ std::string_view constexpr kDefaultCommandFilePath = "compile_commands.json";
 std::string_view constexpr kCompilerNameEnvVar = "COMP_DB_HOOK_COMPILER";
 std::string_view constexpr kDefaultCompilerName = "clang++";
 
-auto constexpr kCompilerFlagsWithArgument =
-    tsdb2::common::fixed_flat_set_of<std::string_view>({"-include", "-iquote", "-o", "-target"});
+auto constexpr kCompilerFlagsWithArgument = tsdb2::common::fixed_flat_set_of<std::string_view>(
+    {"-MF", "-include", "-iquote", "-o", "-target"});
 
 char constexpr kDirectoryField[] = "directory";
 char constexpr kArgumentsField[] = "arguments";
@@ -54,7 +54,7 @@ using CommandEntry =
 using CommandEntries = std::vector<CommandEntry>;
 
 struct SourceFile {
-  // Custom "less-than" functor to index source files by absolute path.
+  // Custom "less-than" functor to index source files by their absolute path.
   struct Less {
     bool operator()(SourceFile const& lhs, SourceFile const& rhs) const {
       return lhs.absolute_path() < rhs.absolute_path();
@@ -90,9 +90,22 @@ struct SourceFile {
 
 using SourceFileSet = tsdb2::common::flat_set<SourceFile, SourceFile::Less>;
 
+absl::StatusOr<std::string> GetCurrentWorkingDirectory() {
+  char buffer[PATH_MAX + 1];
+  if (!::getcwd(buffer, PATH_MAX)) {
+    return absl::ErrnoToStatus(errno, "getcwd");
+  }
+  return std::string(buffer);
+}
+
 std::string GetCommandFilePath() {
   return tsdb2::common::GetEnv(std::string(kCommandFilePathEnvVar))
       .value_or(std::string(kDefaultCommandFilePath));
+}
+
+std::string GetCompilerName() {
+  return tsdb2::common::GetEnv(std::string(kCompilerNameEnvVar))
+      .value_or(std::string(kDefaultCompilerName));
 }
 
 absl::StatusOr<FD> OpenCommandFile() {
@@ -130,7 +143,8 @@ absl::StatusOr<CommandEntries> ParseCommandFile(FD const& fd) {
 std::vector<std::string> MakeArguments(int const argc, char const* const argv[]) {
   std::vector<std::string> result;
   result.reserve(argc);
-  for (size_t i = 0; i < argc; ++i) {
+  result.emplace_back(GetCompilerName());
+  for (size_t i = 1; i < argc; ++i) {
     result.emplace_back(argv[i]);
   }
   return result;
@@ -147,14 +161,6 @@ SourceFileSet GetCurrentFiles(std::string_view const cwd,
     }
   }
   return files;
-}
-
-absl::StatusOr<std::string> GetCurrentWorkingDirectory() {
-  char buffer[PATH_MAX + 1];
-  if (!::getcwd(buffer, PATH_MAX)) {
-    return absl::ErrnoToStatus(errno, "getcwd");
-  }
-  return std::string(buffer);
 }
 
 absl::Status UpdateEntries(absl::Span<std::string const> arguments, CommandEntries* const entries) {
@@ -189,7 +195,7 @@ absl::Status RewriteFile(FD const& fd, CommandEntries const& entries) {
     return absl::ErrnoToStatus(errno, "ftruncate");
   }
   if (::lseek(*fd, 0, SEEK_SET) < 0) {
-    return absl::ErrnoToStatus(errno, "ftruncate");
+    return absl::ErrnoToStatus(errno, "lseek");
   }
   auto const json = tsdb2::json::Stringify(entries, json::StringifyOptions{.pretty = true}) + "\n";
   size_t written = 0;
@@ -217,9 +223,7 @@ absl::Status UpdateCommandFile(int const argc, char const* const argv[]) {
 int main(int const argc, char* const argv[]) {
   absl::InitializeLog();
   CHECK_OK(UpdateCommandFile(argc, argv));
-  auto const compiler_name = tsdb2::common::GetEnv(std::string(kCompilerNameEnvVar))
-                                 .value_or(std::string(kDefaultCompilerName));
-  ::execvp(compiler_name.c_str(), argv);
+  ::execvp(GetCompilerName().c_str(), argv);
   LOG(ERROR) << absl::ErrnoToStatus(errno, "execvp");
   return 1;
 }
