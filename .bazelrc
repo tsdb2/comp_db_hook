@@ -1,0 +1,9 @@
+common --client_env=CC=clang --client_env=CXX=clang++ --cxxopt='-std=c++17' --cxxopt='-fno-exceptions' --cxxopt='-Wno-unused-function' --linkopt='-lssl' --linkopt='-lcrypto'
+
+build:asan --cxxopt='-fsanitize=address' --cxxopt='-fno-omit-frame-pointer' --linkopt='-fsanitize=address' --action_env=ASAN_OPTIONS=detect_leaks=0
+build:lsan --cxxopt='-fsanitize=address' --cxxopt='-fno-omit-frame-pointer' --linkopt='-fsanitize=address' --action_env=ASAN_OPTIONS=detect_leaks=1
+build:msan --cxxopt='-fsanitize=memory' --cxxopt='-fno-omit-frame-pointer' --linkopt='-fsanitize=memory'
+build:tsan --cxxopt='-fsanitize=thread' --cxxopt='-fno-omit-frame-pointer' --linkopt='-fsanitize=thread'
+
+test:asan --action_env=ASAN_OPTIONS=detect_leaks=0
+test:lsan --action_env=ASAN_OPTIONS=detect_leaks=1
