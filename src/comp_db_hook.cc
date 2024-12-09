@@ -1,8 +1,11 @@
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <unistd.h>
 
-#include <cstddef>
+#include <algorithm>
+#include <cstdio>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -15,6 +18,7 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "common/env.h"
 #include "common/flat_set.h"
