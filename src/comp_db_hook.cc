@@ -40,7 +40,7 @@ std::string_view constexpr kCompilerNameEnvVar = "COMP_DB_HOOK_COMPILER";
 std::string_view constexpr kDefaultCompilerName = "clang++";
 
 auto constexpr kCompilerFlagsWithArgument = tsdb2::common::fixed_flat_set_of<std::string_view>(
-    {"-MF", "-include", "-iquote", "-o", "-target"});
+    {"-MF", "-include", "-iquote", "-isystem", "-o", "-target"});
 
 char constexpr kDirectoryField[] = "directory";
 char constexpr kArgumentsField[] = "arguments";

@@ -67,5 +67,5 @@ The following example provides a `.bazelrc` file that uses `comp_db_hook`, disab
 uses C++17, and provides a few compiler and linker flags for all build configurations:
 
 ```
-common --spawn_strategy=local --client_env=CC=comp_db_hook --client_env=CXX=comp_db_hook --cxxopt='-std=c++17' --cxxopt='-fno-exceptions' --cxxopt='-Wno-unused-function' --linkopt='-lssl' --linkopt='-lcrypto'
+common --spawn_strategy=local --action_env=COMP_DB_HOOK_COMPILER=/usr/bin/clang++ --client_env=CC=comp_db_hook --client_env=CXX=comp_db_hook --cxxopt='-std=c++17' --cxxopt='-fno-exceptions' --cxxopt='-Wno-unused-function' --linkopt='-lssl' --linkopt='-lcrypto'
 ```
