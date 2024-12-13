@@ -3,9 +3,7 @@
 #include <limits.h>
 #include <unistd.h>
 
-#include <algorithm>
 #include <cstdio>
-#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>

@@ -4,13 +4,11 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}",
-                "${workspaceFolder}/bazel-comp_db_hook/external/com_google_absl",
-                "${workspaceFolder}/bazel-comp_db_hook/external/com_tsdb2_platform",
-                "${workspaceFolder}/bazel-comp_db_hook/external/com_google_googletest/googlemock/include",
-                "${workspaceFolder}/bazel-comp_db_hook/external/com_google_googletest/googletest/include"
+                "${workspaceFolder}/bazel-comp_db_hook/external/abseil-cpp+",
+                "${workspaceFolder}/bazel-comp_db_hook/external/+_repo_rules+com_tsdb2_platform",
             ],
             "defines": [],
-            "compilerPath": "/usr/bin/clang",
+            "compilerPath": "/usr/bin/clang++-18",
             "cStandard": "c17",
             "cppStandard": "c++17"
         }

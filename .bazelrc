@@ -1,4 +1,8 @@
-common --spawn_strategy=local --action_env=COMP_DB_HOOK_COMPILER=/usr/bin/clang++ --client_env=CC=comp_db_hook --client_env=CXX=comp_db_hook --cxxopt='-std=c++17' --cxxopt='-fno-exceptions' --cxxopt='-Wno-unused-function' --linkopt='-lssl' --linkopt='-lcrypto'
+common --enable_bzlmod --spawn_strategy=local
+common --client_env=CC=comp_db_hook --client_env=CXX=comp_db_hook
+common --action_env=COMP_DB_HOOK_COMPILER=/usr/bin/clang++-18
+common --cxxopt='-std=c++17' --cxxopt='-fno-exceptions' --cxxopt='-Wno-unused-function'
+common --linkopt='-lssl' --linkopt='-lcrypto'
 
 build:asan --cxxopt='-fsanitize=address' --cxxopt='-fno-omit-frame-pointer' --linkopt='-fsanitize=address' --action_env=ASAN_OPTIONS=detect_leaks=0
 build:lsan --cxxopt='-fsanitize=address' --cxxopt='-fno-omit-frame-pointer' --linkopt='-fsanitize=address' --action_env=ASAN_OPTIONS=detect_leaks=1
