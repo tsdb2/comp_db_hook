@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <linux/limits.h>
 #include <unistd.h>
 
 #include <cstdio>
@@ -66,6 +67,8 @@ struct SourceFile {
   explicit SourceFile(std::string_view const base_directory, std::string_view const relative_path)
       : relative_path_(relative_path), absolute_path_(GetFullPath(base_directory, relative_path)) {}
 
+  ~SourceFile() = default;
+
   SourceFile(SourceFile&&) noexcept = default;
   SourceFile& operator=(SourceFile&&) noexcept = default;
   SourceFile(SourceFile const&) = default;
@@ -94,10 +97,11 @@ using SourceFileSet = tsdb2::common::flat_set<SourceFile, SourceFile::Less>;
 
 absl::StatusOr<std::string> GetCurrentWorkingDirectory() {
   char buffer[PATH_MAX + 1];
-  if (!::getcwd(buffer, PATH_MAX)) {
+  if (::getcwd(buffer, PATH_MAX) != nullptr) {
+    return std::string(buffer);
+  } else {
     return absl::ErrnoToStatus(errno, "getcwd");
   }
-  return std::string(buffer);
 }
 
 std::string GetCommandFilePath() {
@@ -112,8 +116,8 @@ std::string GetCompilerName() {
 
 absl::StatusOr<FD> OpenCommandFile() {
   auto const file_path = GetCommandFilePath();
-  FD fd{::open(file_path.c_str(), /*flags=*/O_CREAT | O_CLOEXEC | O_RDWR,
-               /*mode=*/0664)};
+  FD fd{::open(  // NOLINT(cppcoreguidelines-pro-type-vararg)
+      file_path.c_str(), /*flags=*/O_CREAT | O_CLOEXEC | O_RDWR, /*mode=*/0664)};
   if (fd) {
     return std::move(fd);
   } else {
@@ -177,17 +181,19 @@ absl::Status UpdateEntries(absl::Span<std::string const> arguments, CommandEntri
     }
     auto const base_directory = entry.get<kDirectoryField>().value_or(cwd);
     SourceFile file{base_directory, maybe_file_path.value()};
-    if (source_files.erase(file)) {
+    if (source_files.erase(file) > 0) {
       entry.get<kArgumentsField>() = std::vector<std::string>(arguments.begin(), arguments.end());
     }
   }
   for (auto const& file : source_files) {
+    // NOLINTBEGIN(bugprone-argument-comment)
     entries->emplace_back(CommandEntry{
         json::kInitialize,
         /*directory=*/cwd,
         /*arguments=*/std::vector<std::string>(arguments.begin(), arguments.end()),
         /*file=*/file.relative_path(),
     });
+    // NOLINTEND(bugprone-argument-comment)
   }
   return absl::OkStatus();
 }
