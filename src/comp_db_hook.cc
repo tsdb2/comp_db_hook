@@ -32,11 +32,10 @@ using ::tsdb2::io::FD;
 
 namespace json = ::tsdb2::json;
 
-std::string_view constexpr kCommandFilePathEnvVar = "COMP_DB_HOOK_COMMAND_FILE_PATH";
-std::string_view constexpr kDefaultCommandFilePath = "compile_commands.json";
-
 std::string_view constexpr kCompilerNameEnvVar = "COMP_DB_HOOK_COMPILER";
 std::string_view constexpr kDefaultCompilerName = "clang++";
+
+std::string_view constexpr kWorkspaceDirEnvVar = "COMP_DB_HOOK_WORKSPACE_DIR";
 
 auto constexpr kCompilerFlagsWithArgument = tsdb2::common::fixed_flat_set_of<std::string_view>(
     {"-MF", "-include", "-iquote", "-isystem", "-o", "-target"});
@@ -56,6 +55,16 @@ using CommandEntry =
 
 using CommandEntries = std::vector<CommandEntry>;
 
+std::string JoinPath(std::string_view const base_directory, std::string_view const file_name) {
+  if (base_directory.empty() || absl::StartsWith(file_name, "/")) {
+    return std::string(file_name);
+  } else if (absl::EndsWith(base_directory, "/")) {
+    return absl::StrCat(base_directory, file_name);
+  } else {
+    return absl::StrCat(base_directory, "/", file_name);
+  }
+}
+
 struct SourceFile {
   // Custom "less-than" functor to index source files by their absolute path.
   struct Less {
@@ -65,7 +74,7 @@ struct SourceFile {
   };
 
   explicit SourceFile(std::string_view const base_directory, std::string_view const relative_path)
-      : relative_path_(relative_path), absolute_path_(GetFullPath(base_directory, relative_path)) {}
+      : relative_path_(relative_path), absolute_path_(JoinPath(base_directory, relative_path)) {}
 
   ~SourceFile() = default;
 
@@ -78,24 +87,17 @@ struct SourceFile {
   std::string_view absolute_path() const { return absolute_path_; }
 
  private:
-  static std::string GetFullPath(std::string_view const base_directory,
-                                 std::string_view const file_name) {
-    if (base_directory.empty() || absl::StartsWith(file_name, "/")) {
-      return std::string(file_name);
-    } else if (absl::EndsWith(base_directory, "/")) {
-      return absl::StrCat(base_directory, file_name);
-    } else {
-      return absl::StrCat(base_directory, "/", file_name);
-    }
-  }
-
   std::string relative_path_;
   std::string absolute_path_;
 };
 
 using SourceFileSet = tsdb2::common::flat_set<SourceFile, SourceFile::Less>;
 
-absl::StatusOr<std::string> GetCurrentWorkingDirectory() {
+absl::StatusOr<std::string> GetWorkspaceDirectory() {
+  auto maybe_directory = tsdb2::common::GetEnv(std::string(kWorkspaceDirEnvVar));
+  if (maybe_directory.has_value()) {
+    return std::move(maybe_directory).value();
+  }
   char buffer[PATH_MAX + 1];
   if (::getcwd(buffer, PATH_MAX) != nullptr) {
     return std::string(buffer);
@@ -104,9 +106,9 @@ absl::StatusOr<std::string> GetCurrentWorkingDirectory() {
   }
 }
 
-std::string GetCommandFilePath() {
-  return tsdb2::common::GetEnv(std::string(kCommandFilePathEnvVar))
-      .value_or(std::string(kDefaultCommandFilePath));
+absl::StatusOr<std::string> GetCommandFilePath() {
+  DEFINE_VAR_OR_RETURN(workspace_directory, GetWorkspaceDirectory());
+  return JoinPath(std::move(workspace_directory), "compile_commands.json");
 }
 
 std::string GetCompilerName() {
@@ -115,7 +117,7 @@ std::string GetCompilerName() {
 }
 
 absl::StatusOr<FD> OpenCommandFile() {
-  auto const file_path = GetCommandFilePath();
+  DEFINE_CONST_OR_RETURN(file_path, GetCommandFilePath());
   FD fd{::open(  // NOLINT(cppcoreguidelines-pro-type-vararg)
       file_path.c_str(), /*flags=*/O_CREAT | O_CLOEXEC | O_RDWR, /*mode=*/0664)};
   if (fd) {
@@ -170,12 +172,12 @@ SourceFileSet GetCurrentFiles(std::string_view const cwd,
 }
 
 absl::Status UpdateEntries(absl::Span<std::string const> arguments, CommandEntries* const entries) {
-  DEFINE_CONST_OR_RETURN(cwd, GetCurrentWorkingDirectory());
+  DEFINE_CONST_OR_RETURN(cwd, GetWorkspaceDirectory());
   auto source_files = GetCurrentFiles(cwd, arguments);
   for (auto& entry : *entries) {
     auto const maybe_file_path = entry.get<kFileField>();
     if (!maybe_file_path.has_value()) {
-      LOG(ERROR) << GetCommandFilePath() << " contains an entry without a `file` field:\n"
+      LOG(ERROR) << "compile_commands.json contains an entry without a `file` field:\n"
                  << json::Stringify(entry);
       continue;
     }
