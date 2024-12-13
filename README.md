@@ -52,7 +52,7 @@ The (relative) path of the produced JSON file is `compile_commands.json` by defa
 will be created or updated in the current working directory. The path can be changed using the
 `COMP_DB_HOOK_COMMAND_FILE_PATH` environment variable and can also be an absolute path.
 
-## Note About Bazel
+## Notes About Bazel
 
 `comp_db_hook` will not work with Bazel out of the box because Bazel runs its toolchains inside a
 sandbox by default, so the various `comp_db_hook` commands issued by Bazel won't be able to see each
@@ -60,12 +60,23 @@ other's output. If you try to use `comp_db_hook` without disabling the sandbox f
 outcome is that `compile_commands.json` will contain an empty array.
 
 In order to disable the sandbox you need to specify the `--spawn_strategy=local` command line flag.
-Together with the overrides for the `CC` and `CXX` environment variables they can be configured in
-your `.bazelrc` file.
 
-The following example provides a `.bazelrc` file that uses `comp_db_hook`, disables the sandbox,
-uses C++17, and provides a few compiler and linker flags for all build configurations:
+Even with the `local` spawn strategy you need to explicitly provide `comp_db_hook` with the absolute
+path to the directory of your workspace (i.e. where you want the `compile_commands.json` file to
+appear). That is because Bazel runs the compiler in a completely different directory that mirrors
+your workspace, the so-called "execroot". The workspace directory path is supplied via the
+`COMP_DB_HOOK_WORKSPACE_DIR` environment variable, which defaults to the current working directory
+which is **not** what you want if you use Bazel.
+
+Both the spawn strategy and the workspace path can be configured in your `.bazelrc` file. The
+following `.bazelrc` example shows how to use `comp_db_hook`, disable the sandbox, use C++17, and
+define a few compiler and linker flags for all build configurations:
 
 ```
-common --spawn_strategy=local --action_env=COMP_DB_HOOK_COMPILER=/usr/bin/clang++ --client_env=CC=comp_db_hook --client_env=CXX=comp_db_hook --cxxopt='-std=c++17' --cxxopt='-fno-exceptions' --cxxopt='-Wno-unused-function' --linkopt='-lssl' --linkopt='-lcrypto'
+common --spawn_strategy=local
+common --client_env=CC=comp_db_hook --client_env=CXX=comp_db_hook
+common --action_env=COMP_DB_HOOK_COMPILER=/usr/bin/clang++
+common --action_env=COMP_DB_HOOK_WORKSPACE_DIR=/home/myself/tsdb2/comp_db_hook/
+common --cxxopt='-std=c++17' --cxxopt='-fno-exceptions' --cxxopt='-Wno-unused-function'
+common --linkopt='-lssl' --linkopt='-lcrypto'
 ```
