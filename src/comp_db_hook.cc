@@ -144,6 +144,8 @@ absl::StatusOr<CommandEntries> ParseCommandFile(FD const& fd) {
   if (status_or_entries.ok()) {
     return status_or_entries;
   } else {
+    LOG(ERROR) << "Failed to parse compile_commands.json: " << status_or_entries.status()
+               << ". Will restart with a new file.";
     return CommandEntries();
   }
 }
