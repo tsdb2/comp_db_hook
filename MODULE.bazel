@@ -19,7 +19,7 @@ bazel_dep(
 
 http_archive(
     name = "com_tsdb2_platform",
-    url = "https://github.com/tsdb2/platform/archive/refs/tags/v0.0.5.tar.gz",
-    sha256 = "39aa487d8b9137b705a2ca54fde1a91cc26d256e7258888601001778928378d8",
-    strip_prefix = "platform-0.0.5",
+    url = "https://github.com/tsdb2/platform/archive/refs/tags/v0.0.7.tar.gz",
+    sha256 = "c4110aedd62e9c4087b609b411c513fc4f4d61099f612e07c10773db8f5baf97",
+    strip_prefix = "platform-0.0.7",
 )

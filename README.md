@@ -76,7 +76,7 @@ define a few compiler and linker flags for all build configurations:
 common --spawn_strategy=local
 common --client_env=CC=comp_db_hook --client_env=CXX=comp_db_hook
 common --action_env=COMP_DB_HOOK_COMPILER=/usr/bin/clang++
-common --action_env=COMP_DB_HOOK_WORKSPACE_DIR=/home/myself/tsdb2/comp_db_hook/
+common --action_env=COMP_DB_HOOK_WORKSPACE_DIR=/home/myself/my_project/
 common --cxxopt='-std=c++17' --cxxopt='-fno-exceptions' --cxxopt='-Wno-unused-function'
 common --linkopt='-lssl' --linkopt='-lcrypto'
 ```
