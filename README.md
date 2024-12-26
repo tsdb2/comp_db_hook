@@ -3,7 +3,9 @@
 ## Overview
 
 This small program can be used in a C++ project to intercept all calls to the compiler and update a
-[compilation database JSON file](https://clang.llvm.org/docs/JSONCompilationDatabase.html). The JSON file can in turn be used with many Clang-based tools like [IWYU](https://include-what-you-use.org/).
+[compilation database JSON file](https://clang.llvm.org/docs/JSONCompilationDatabase.html). The JSON
+file can in turn be used with many Clang-based tools like [clangd](https://clangd.llvm.org/) and
+[IWYU](https://include-what-you-use.org/).
 
 `comp_db_hook` is particularly useful with [Bazel](https://bazel.build/), which doesn't generate a
 compilation database natively and is quite hard to extend.
@@ -48,9 +50,8 @@ The name of the compiler spawned by `comp_db_hook` is `clang++` by default and c
 $ env COMP_DB_HOOK_COMPILER=g++ comp_db_hook -std=c++17 -Wall src/file.cc -lssl -lcrypto
 ```
 
-The (relative) path of the produced JSON file is `compile_commands.json` by default, so the file
-will be created or updated in the current working directory. The path can be changed using the
-`COMP_DB_HOOK_COMMAND_FILE_PATH` environment variable and can also be an absolute path.
+The resulting JSON compilation database file is called `compile_commands.json` and stored in the
+current working directory (but see the notes below if you use Bazel).
 
 ## Notes About Bazel
 
@@ -64,7 +65,8 @@ In order to disable the sandbox you need to specify the `--spawn_strategy=local`
 Even with the `local` spawn strategy you need to explicitly provide `comp_db_hook` with the absolute
 path to the directory of your workspace (i.e. where you want the `compile_commands.json` file to
 appear). That is because Bazel runs the compiler in a completely different directory that mirrors
-your workspace, the so-called "execroot". The workspace directory path is supplied via the
+your workspace, the so-called "execution root" (you can retrieve its path by running
+`bazel info execution_root`). The workspace directory path is supplied via the
 `COMP_DB_HOOK_WORKSPACE_DIR` environment variable, which defaults to the current working directory
 which is **not** what you want if you use Bazel.
 
