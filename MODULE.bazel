@@ -5,7 +5,7 @@ See the README file for more information.
 
 module(
     name = "tsdb2_comp_db_hook",
-    version = "0.2.0",
+    version = "0.2.1",
     repo_name = "com_tsdb2_comp_db_hook",
 )
 
@@ -19,7 +19,7 @@ bazel_dep(
 
 http_archive(
     name = "com_tsdb2_platform",
-    url = "https://github.com/tsdb2/platform/archive/refs/tags/v0.0.7.tar.gz",
-    sha256 = "c4110aedd62e9c4087b609b411c513fc4f4d61099f612e07c10773db8f5baf97",
-    strip_prefix = "platform-0.0.7",
+    url = "https://github.com/tsdb2/platform/archive/refs/tags/v0.0.8.tar.gz",
+    sha256 = "a671f69ed9c6b0bba175faa293d9a12c79596b668612dcc1b2810ce1fd36b062",
+    strip_prefix = "platform-0.0.8",
 )

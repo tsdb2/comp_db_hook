@@ -127,7 +127,8 @@ absl::StatusOr<FD> OpenCommandFile() {
   }
 }
 
-absl::StatusOr<CommandEntries> ParseCommandFile(FD const& fd) {
+template <typename Type>
+absl::StatusOr<Type> ParseJsonFile(FD const& fd) {
   std::string json;
   static size_t constexpr kBufferSize = 4096;
   char buffer[kBufferSize];
@@ -140,14 +141,18 @@ absl::StatusOr<CommandEntries> ParseCommandFile(FD const& fd) {
       json += std::string_view(buffer, result);
     }
   } while (!(result < kBufferSize));
-  auto status_or_entries = json::Parse<CommandEntries>(json);
+  auto status_or_entries = json::Parse<Type>(json);
   if (status_or_entries.ok()) {
     return status_or_entries;
   } else {
     LOG(ERROR) << "Failed to parse compile_commands.json: " << status_or_entries.status()
                << ". Will restart with a new file.";
-    return CommandEntries();
+    return Type();
   }
+}
+
+absl::StatusOr<CommandEntries> ParseCommandFile(FD const& fd) {
+  return ParseJsonFile<CommandEntries>(fd);
 }
 
 std::vector<std::string> MakeArguments(int const argc, char const* const argv[]) {
@@ -173,7 +178,8 @@ SourceFileSet GetCurrentFiles(std::string_view const cwd,
   return files;
 }
 
-absl::Status UpdateEntries(absl::Span<std::string const> arguments, CommandEntries* const entries) {
+absl::Status UpdateEntries(absl::Span<std::string const> const arguments,
+                           CommandEntries* const entries) {
   DEFINE_CONST_OR_RETURN(cwd, GetWorkspaceDirectory());
   auto source_files = GetCurrentFiles(cwd, arguments);
   for (auto& entry : *entries) {
@@ -209,7 +215,11 @@ absl::Status RewriteFile(FD const& fd, CommandEntries const& entries) {
   if (::lseek(*fd, 0, SEEK_SET) < 0) {
     return absl::ErrnoToStatus(errno, "lseek");
   }
-  auto const json = tsdb2::json::Stringify(entries, json::StringifyOptions{.pretty = true}) + "\n";
+  json::StringifyOptions const options{
+      .pretty = true,
+      .trailing_newline = true,
+  };
+  auto const json = tsdb2::json::Stringify(entries, options);
   size_t written = 0;
   while (written < json.size()) {
     auto const result = ::write(*fd, json.data() + written, json.size() - written);
