@@ -94,5 +94,7 @@
     "${workspaceFolder}",
     "${workspaceFolder}/bazel-comp_db_hook/external/abseil-cpp+",
     "${workspaceFolder}/bazel-comp_db_hook/external/+_repo_rules+com_tsdb2_platform"
-  ]
+  ],
+  "clangd.path": "/usr/bin/clangd-18",
+  "editor.tabSize": 2
 }
