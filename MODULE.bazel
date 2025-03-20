@@ -12,6 +12,11 @@ module(
 http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 bazel_dep(
+    name = "rules_cc",
+    version = "0.1.1",
+)
+
+bazel_dep(
     name = "abseil-cpp",
     version = "20240722.0.bcr.2",
     repo_name = "com_google_absl",
